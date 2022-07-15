@@ -30,7 +30,7 @@ jobs:
     - name: Build webapp
       run: |
         pwd
-        cd server
+        cd webapp
         npm ci
         npm run build
     
