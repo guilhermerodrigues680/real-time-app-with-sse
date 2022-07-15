@@ -4,14 +4,20 @@ import React, {
   useState,
   PropsWithChildren,
 } from "react";
+import {
+  ApiSSEClient,
+  SSEMessage,
+  SSEPingMessage,
+} from "../services/api-sse-client/ApiSSEClient";
+
+type SSEConnectionStatus = "CONNECTING" | "OPEN" | "CLOSED";
 
 interface SSEMessageInterface {
   timestamp: Date;
-  event: string | null;
+  event: "message";
   data: object | null;
+  lastEventId?: string;
 }
-
-type SSEConnectionStatus = "CONNECTING" | "OPEN" | "CLOSED";
 
 interface SSEContextInterface {
   lastMessage: SSEMessageInterface | null;
@@ -34,52 +40,30 @@ const SSEProvider: React.FC<PropsWithChildren> = ({ children }) => {
     useState<SSEConnectionStatus>("CONNECTING");
 
   useEffect(() => {
-    // TODO: Criar uma classe para essa comunicação
-    const evtSource = new EventSource("http://localhost:5170/api/streaming");
-    console.debug(evtSource);
+    const apiSSECli = new ApiSSEClient();
+    console.debug(apiSSECli);
 
-    const handleOpen = (event: MessageEvent) => {
-      console.info("[SSE] open", event.data);
-      setConnStatus("OPEN");
-    };
-
-    const handleError = (event: MessageEvent) => {
-      console.error("[SSE] error", event.data);
-      // Após um erro o EventSource tenta reconectar automaticamente
-      setConnStatus("CONNECTING");
-    };
-
-    const handleMessage = (event: MessageEvent) => {
-      console.debug(event.data);
-      const msg = {
-        data: event.data,
-        event: "message",
-        timestamp: new Date(),
-      };
+    const handleOpen = () => setConnStatus("OPEN");
+    const handleConnecting = () => setConnStatus("CONNECTING");
+    const handleClose = () => setConnStatus("CLOSED");
+    const handleMessage = (msg: SSEMessage) => {
+      msg.event;
       setLastMessage(msg);
       setMessages((msgs) => [...msgs, msg]);
     };
 
-    const handlePing = (event: MessageEvent) => {
-      type PingMessage = { timestamp: Date };
-
-      const pingMessage = JSON.parse(event.data) as PingMessage;
-      const { timestamp } = pingMessage;
-      console.debug(`ping ${event.lastEventId} at ${timestamp}`);
+    const handlePing = (msg: SSEPingMessage) => {
+      const { timestamp } = msg.data;
+      console.debug(`ping ${msg.lastEventId} at ${timestamp}`);
     };
 
-    evtSource.addEventListener("open", handleOpen);
-    evtSource.addEventListener("error", handleError);
-    evtSource.addEventListener("message", handleMessage);
-    evtSource.addEventListener("ping", handlePing);
-    return () => {
-      evtSource.close();
-      setConnStatus("CLOSED");
-      evtSource.removeEventListener("open", handleOpen);
-      evtSource.removeEventListener("error", handleError);
-      evtSource.removeEventListener("message", handleMessage);
-      evtSource.removeEventListener("ping", handlePing);
-    };
+    apiSSECli.on("open", handleOpen);
+    apiSSECli.on("connecting", handleConnecting);
+    apiSSECli.on("close", handleClose);
+    apiSSECli.on("message", handleMessage);
+    // evtSource.addEventListener("ping", handlePing);
+
+    return () => apiSSECli.destroy();
   }, []);
 
   useEffect(() => {
