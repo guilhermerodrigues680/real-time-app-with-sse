@@ -18,7 +18,7 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '14.19.2'
-        cache: 'npm'
+        # cache: 'npm'
     
     - name: Build server
       run: |
