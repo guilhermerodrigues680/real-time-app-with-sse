@@ -45,6 +45,7 @@ jobs:
         pwd
         mkdir -p server/public
         mv webapp/dist/{.*,*} server/public/ || true
+        rm -rf  .gitignore server/{.vscode,node_modules,src,.eslintignore,.eslintrc.js,.gitignore,tsconfig.json}
         git config user.name github-actions
         git config user.email github-actions@github.com
         git add -A
