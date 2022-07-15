@@ -20,8 +20,8 @@ class SSEClient extends EventEmitter {
   private readonly req: IncomingMessage;
   private readonly wStream: ServerResponse;
   private isConnOpen: boolean;
-  private pingCount = 0;
-  private pingTimeoutID: NodeJS.Timeout | null;
+  private keepAliveCount = 0;
+  private keepAliveTimeoutID: NodeJS.Timeout | null;
   readonly clientInfo: ClientInfo;
 
   constructor(req: IncomingMessage, wStream: ServerResponse) {
@@ -29,7 +29,7 @@ class SSEClient extends EventEmitter {
     this.req = req;
     this.wStream = wStream;
     this.isConnOpen = true;
-    this.pingTimeoutID = null;
+    this.keepAliveTimeoutID = null;
     this.clientInfo = {
       userAgent: this.parseReqHeader(req.headers["user-agent"]),
       xForwardedFor: this.parseReqHeader(req.headers["x-forwarded-for"]),
@@ -37,10 +37,11 @@ class SSEClient extends EventEmitter {
       remotePort: req.socket.remotePort || 0,
     };
 
-    this.sendPing();
+    this.keepAlive();
     this.req.once("close", () => {
       this.isConnOpen = false;
-      this.pingTimeoutID !== null && clearInterval(this.pingTimeoutID);
+      this.keepAliveTimeoutID !== null &&
+        clearInterval(this.keepAliveTimeoutID);
       this.emit(SSEClientEvents.CLOSE);
     });
   }
@@ -62,21 +63,16 @@ class SSEClient extends EventEmitter {
     }
   }
 
-  private sendPing() {
+  private keepAlive() {
     if (!this.isConnOpen) {
-      console.warn("conexão encerrada. Para ping");
+      console.debug("conexão encerrada. Para keep-alive.");
       return;
     }
 
-    const { pingCount } = this;
-    this.sendTypedEvent(
-      SSEEvents.PING,
-      JSON.stringify({ timestamp: new Date() }),
-      pingCount
-    );
-    this.sendComment(pingCount);
-    this.pingCount++;
-    this.pingTimeoutID = setTimeout(() => this.sendPing(), 2500);
+    const { keepAliveCount } = this;
+    this.sendComment(keepAliveCount);
+    this.keepAliveCount++;
+    this.keepAliveTimeoutID = setTimeout(() => this.keepAlive(), 2500);
   }
 
   private sendComment(comment: string | number) {

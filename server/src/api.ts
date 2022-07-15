@@ -42,6 +42,13 @@ api.get("/api/streaming", async (req, res) => {
     // console.log("Emit", count);
     // Emit an SSE that contains the current 'count' as a string
     sseCli.sendMessage(count);
+    // Emit um evento tipado PING.
+    // Observe que isso não é necessário, o SSEClient possui uma rotina de keep-alive
+    sseCli.sendTypedEvent(
+      "ping",
+      JSON.stringify({ timestamp: new Date() }),
+      count
+    );
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
