@@ -1,5 +1,12 @@
 import { EventEmitter } from "events";
-import { Readable, Writable } from "stream";
+import { IncomingMessage, ServerResponse } from "http";
+
+type ClientInfo = {
+  userAgent: string;
+  xForwardedFor: string;
+  remoteAddress: string;
+  remotePort: number;
+};
 
 enum SSEEvents {
   PING = "ping",
@@ -10,19 +17,30 @@ enum SSEClientEvents {
 }
 
 class SSEClient extends EventEmitter {
-  private readonly req: Readable;
-  private readonly wStream: Writable;
-  private connOpen = true;
+  private readonly req: IncomingMessage;
+  private readonly wStream: ServerResponse;
+  private isConnOpen: boolean;
   private pingCount = 0;
+  private pingTimeoutID: NodeJS.Timeout | null;
+  readonly clientInfo: ClientInfo;
 
-  constructor(req: Readable, wStream: Writable) {
+  constructor(req: IncomingMessage, wStream: ServerResponse) {
     super();
     this.req = req;
     this.wStream = wStream;
+    this.isConnOpen = true;
+    this.pingTimeoutID = null;
+    this.clientInfo = {
+      userAgent: this.parseReqHeader(req.headers["user-agent"]),
+      xForwardedFor: this.parseReqHeader(req.headers["x-forwarded-for"]),
+      remoteAddress: req.socket.remoteAddress || "",
+      remotePort: req.socket.remotePort || 0,
+    };
 
     this.sendPing();
     this.req.once("close", () => {
-      this.connOpen = false;
+      this.isConnOpen = false;
+      this.pingTimeoutID !== null && clearInterval(this.pingTimeoutID);
       this.emit(SSEClientEvents.CLOSE);
     });
   }
@@ -33,12 +51,19 @@ class SSEClient extends EventEmitter {
   // TODO
   // keep-alive
 
-  private handleClose() {
-    console.debug("conn closed");
+  private parseReqHeader(headerVal?: string | string[]): string {
+    switch (typeof headerVal) {
+      case "undefined":
+        return "";
+      case "string":
+        return headerVal;
+      default:
+        return headerVal.join(", ");
+    }
   }
 
   private sendPing() {
-    if (!this.connOpen) {
+    if (!this.isConnOpen) {
       console.warn("conexão encerrada. Para ping");
       return;
     }
@@ -51,45 +76,37 @@ class SSEClient extends EventEmitter {
     );
     this.sendComment(pingCount);
     this.pingCount++;
-    setTimeout(() => this.sendPing(), 2500);
-  }
-
-  private handleWriteError(error: Error | null | undefined) {
-    if (error) {
-      console.debug(error);
-    }
+    this.pingTimeoutID = setTimeout(() => this.sendPing(), 2500);
   }
 
   private sendComment(comment: string | number) {
-    if (!this.connOpen) {
+    if (!this.isConnOpen) {
       console.warn("conexão encerrada");
       return;
     }
 
-    this.wStream.write(`: ${comment}\n\n`, this.handleWriteError);
+    this.wStream.write(`: ${comment}\n\n`);
   }
 
   sendMessage(evtData: any, id?: string | number) {
-    if (!this.connOpen) {
+    if (!this.isConnOpen) {
       console.warn("conexão encerrada");
       return;
     }
 
-    id !== undefined &&
-      this.wStream.write(`id: ${id}\n`, this.handleWriteError);
-    this.wStream.write(`data: ${evtData}\n\n`, this.handleWriteError);
+    id !== undefined && this.wStream.write(`id: ${id}\n`);
+    this.wStream.write(`data: ${evtData}\n\n`);
   }
 
   sendTypedEvent(evtName: string, evtData?: any, id?: string | number) {
-    if (!this.connOpen) {
+    if (!this.isConnOpen) {
       console.warn("conexão encerrada");
       return;
     }
 
-    id !== undefined &&
-      this.wStream.write(`id: ${id}\n`, this.handleWriteError);
-    this.wStream.write(`event: ${evtName}\n`, this.handleWriteError);
-    this.wStream.write(`data: ${evtData}\n\n`, this.handleWriteError);
+    id !== undefined && this.wStream.write(`id: ${id}\n`);
+    this.wStream.write(`event: ${evtName}\n`);
+    this.wStream.write(`data: ${evtData}\n\n`);
   }
 }
 

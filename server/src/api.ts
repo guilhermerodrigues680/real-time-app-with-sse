@@ -24,6 +24,11 @@ api.get("/api/streaming", async (req, res) => {
   // Tell the client to retry every 10 seconds if connectivity is lost
   // res.write("retry: 10000\n\n");
   const sseCli = new SSEClient(req, res);
+  console.log(
+    "New SSE Client:",
+    `${sseCli.clientInfo.remoteAddress}:${sseCli.clientInfo.remotePort}`,
+    sseCli.clientInfo.userAgent
+  );
 
   let connOpen = true;
   sseCli.once("close", () => {
@@ -33,16 +38,18 @@ api.get("/api/streaming", async (req, res) => {
   let count = 0;
 
   while (connOpen) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    console.log("Emit", ++count);
+    count++;
+    // console.log("Emit", count);
     // Emit an SSE that contains the current 'count' as a string
     sseCli.sendMessage(count);
-
-    //   res.write(`data: ${count}\n\n`);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
-  console.info("conexão encerrada");
+  console.log(
+    "Close SSE Client:",
+    `${sseCli.clientInfo.remoteAddress}:${sseCli.clientInfo.remotePort}`,
+    sseCli.clientInfo.userAgent
+  );
 });
 
 export default api;
