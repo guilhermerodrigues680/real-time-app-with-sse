@@ -1,27 +1,17 @@
-// function sayMyName(name: string): void {
-//   if (name === "Heisenberg") {
-//     console.log("You're right 👍");
-//   } else {
-//     console.log("You're wrong 👎");
-//   }
-// }
+import express, { Request, Response } from "express";
+import cors from "cors";
+import api from "./api";
 
-// sayMyName("Heisenberg");
-
-import express from "express";
-import { Router, Request, Response } from "express";
-
-const port = 3333;
+const port = 5170;
 const app = express();
-const route = Router();
 
+app.use(cors());
 app.use(express.json());
+app.use(api);
 
-route.get("/", (req: Request, res: Response) => {
-  res.json({ message: "hello world with Typescript" });
+app.get("/", (req: Request, res: Response) => {
+  res.send("hello world with Typescript");
 });
-
-app.use(route);
 
 app.listen(port, () => {
   console.info(
