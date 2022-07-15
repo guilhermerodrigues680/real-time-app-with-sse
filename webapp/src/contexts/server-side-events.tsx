@@ -11,14 +11,18 @@ interface SSEMessageInterface {
   data: object | null;
 }
 
+type SSEConnectionStatus = "CONNECTING" | "OPEN" | "CLOSED";
+
 interface SSEContextInterface {
   lastMessage: SSEMessageInterface | null;
   messages: SSEMessageInterface[];
+  connStatus: SSEConnectionStatus;
 }
 
 const SSEContext = createContext<SSEContextInterface>({
   lastMessage: null,
   messages: [],
+  connStatus: "CONNECTING",
 });
 
 const SSEProvider: React.FC<PropsWithChildren> = ({ children }) => {
@@ -26,16 +30,23 @@ const SSEProvider: React.FC<PropsWithChildren> = ({ children }) => {
     null
   );
   const [messages, setMessages] = useState<SSEMessageInterface[]>([]);
+  const [connStatus, setConnStatus] =
+    useState<SSEConnectionStatus>("CONNECTING");
 
   useEffect(() => {
+    // TODO: Criar uma classe para essa comunicação
     const evtSource = new EventSource("http://localhost:5170/api/streaming");
+    console.debug(evtSource);
 
     const handleOpen = (event: MessageEvent) => {
       console.info("[SSE] open", event.data);
+      setConnStatus("OPEN");
     };
 
     const handleError = (event: MessageEvent) => {
       console.error("[SSE] error", event.data);
+      // Após um erro o EventSource tenta reconectar automaticamente
+      setConnStatus("CONNECTING");
     };
 
     const handleMessage = (event: MessageEvent) => {
@@ -63,6 +74,7 @@ const SSEProvider: React.FC<PropsWithChildren> = ({ children }) => {
     evtSource.addEventListener("ping", handlePing);
     return () => {
       evtSource.close();
+      setConnStatus("CLOSED");
       evtSource.removeEventListener("open", handleOpen);
       evtSource.removeEventListener("error", handleError);
       evtSource.removeEventListener("message", handleMessage);
@@ -76,7 +88,7 @@ const SSEProvider: React.FC<PropsWithChildren> = ({ children }) => {
   }, []);
 
   return (
-    <SSEContext.Provider value={{ lastMessage, messages }}>
+    <SSEContext.Provider value={{ lastMessage, messages, connStatus }}>
       {children}
     </SSEContext.Provider>
   );

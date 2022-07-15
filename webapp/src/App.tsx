@@ -4,7 +4,7 @@ import reactLogo from "./assets/react.svg";
 import "./App.css";
 
 function App() {
-  const { lastMessage, messages } = useContext(sse.SSEContext);
+  const { lastMessage, messages, connStatus } = useContext(sse.SSEContext);
   const [count, setCount] = useState(0);
 
   return (
@@ -26,6 +26,8 @@ function App() {
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>
         <p>
+          Status conexão: {connStatus}
+          <br />
           {JSON.stringify(lastMessage)}
           <br />
           {JSON.stringify(messages.slice(-6))}{" "}
